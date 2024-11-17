@@ -128,6 +128,13 @@ panic(char *s)
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
+static void print_unicode_hindi(uint c, int *pos){
+
+
+  crt[*pos] = (c & 0xff) | 0x0700;
+}
+
+
 static void
 cgaputc(int c)
 {
@@ -143,7 +150,10 @@ cgaputc(int c)
     pos += 80 - pos%80;
   else if(c == BACKSPACE){
     if(pos > 0) --pos;
-  } else
+  } 
+  else if (c >= 0x0900 && c <= 0x097F) {
+  print_unicode_hindi(c,&pos);
+  } else 
     crt[pos++] = (c&0xff) | 0x0700;  // black on white
 
   if(pos < 0 || pos > 25*80)

@@ -4,6 +4,8 @@
 #include "kbd.h"
 
 #define DELAY_IRRITATE 10000000
+int devil_mode = 0;
+
 int
 kbdgetc(void)
 {

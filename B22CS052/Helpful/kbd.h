@@ -70,6 +70,28 @@ static uchar normalmap[256] =
   [0xD2] KEY_INS,   [0xD3] KEY_DEL
 };
 
+static uint hindimap[256] = 
+{
+  NO,     0x1B,   0x0967, 0x0968, 0x0969, 0x096A, 0x096B, 0x096C,  // 0x00
+  0x096D, 0x096E, 0x096F, 0x0966, 0x2013, 0x003D,    '\b',   '\t',
+  0x0950, 0x0935, 0x090F, 0x0930, 0x091F, 0x092F, 0x0909, 0x0907,  // 0x10
+  0x0913, 0x092A, '[',    ']',    '\n',   NO,     0x0905, 0x0938,
+  0x0921, 0x092B, 0x0917, 0x0939, 0x091C, 0x0915, 0x0932,  ';',  // 0x20
+  '\'',   '`',    NO,     '\\',   0x091D, 0x0936, 0x091A, 0x0935,
+  0x092C, 0x0928, 0x092E, ',',    0x0964, '/',    NO,     '*',  // 0x30
+  NO,     ' ',    NO,     NO,     NO,     NO,     NO,     NO,
+  NO,     NO,     NO,     NO,     NO,     NO,     NO,     '7',  // 0x40
+  '8',    '9',    '-',    '4',    '5',    '6',    '+',    '1',
+  '2',    '3',    '0',    '.',    NO,     NO,     NO,     NO,   // 0x50
+  [0x9C] '\n',      // KP_Enter
+  [0xB5] '/',       // KP_Div
+  [0xC8] KEY_UP,    [0xD0] KEY_DN,
+  [0xC9] KEY_PGUP,  [0xD1] KEY_PGDN,
+  [0xCB] KEY_LF,    [0xCD] KEY_RT,
+  [0x97] KEY_HOME,  [0xCF] KEY_END,
+  [0xD2] KEY_INS,   [0xD3] KEY_DEL
+};
+
 static uchar shiftmap[256] =
 {
   NO,   033,  '!',  '@',  '#',  '$',  '%',  '^',  // 0x00

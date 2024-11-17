@@ -14,6 +14,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "x86.h"
+#include "console.h"
 
 static void consputc(int);
 
@@ -201,11 +202,14 @@ struct {
 void
 consoleintr(int (*getc)(void))
 {
-  int c, doprocdump = 0;
+  int c, doprocdump = 0,should_auto_complete = 0;
 
   acquire(&cons.lock);
   while((c = getc()) >= 0){
     switch(c){
+    case '\t':
+      should_auto_complete = 1;
+      break;
     case C('P'):  // Process listing.
       // procdump() locks cons.lock indirectly; invoke later
       doprocdump = 1;
@@ -237,7 +241,10 @@ consoleintr(int (*getc)(void))
     }
   }
   release(&cons.lock);
-  if(doprocdump) {
+  if(should_auto_complete){
+    auto_complete();
+  }
+  else if(doprocdump) {
     procdump();  // now call procdump() wo. cons.lock held
   }
 }
@@ -305,5 +312,44 @@ consoleinit(void)
   cons.locking = 1;
 
   ioapicenable(IRQ_KBD, 0);
+}
+
+void auto_complete() {
+  int i,j,q;
+  int match_len = 0;
+  char *best_match = "";
+  char word_to_match [128];
+  for(q = 0;input.e - q > input.r &&  input.buf[input.e - q - 1] != ' ';q++) word_to_match[q] = input.buf[input.e-q-1];
+  q--;
+  for(int i = 0; i < 50;i++){
+    char* word  = autocomplete_words[i];
+    for(j = 0; word[j] != '\0' && q-j >= 0;j++){
+      if(word[j] != word_to_match[q-j]){
+        break;
+      }
+    }
+    if(j > q){
+      match_len = j;
+      best_match = word;
+      break;
+    }
+  }
+  if(match_len > 0) {
+    int k = 0;
+    while(input.e > input.r && input.e != input.w && input.buf[(input.e-1) % INPUT_BUF] != '\n' && input.buf[(input.e-1) % INPUT_BUF] != ' '){
+        input.e--;
+        consputc(BACKSPACE);
+    }
+    while (best_match[k] != '\0' && input.e - input.r < INPUT_BUF){
+      input.buf[input.e++ % INPUT_BUF] = best_match[k];
+      consputc(best_match[k]);
+      if(input.e == input.r+INPUT_BUF){
+          input.w = input.e;
+          wakeup(&input.r);
+        }
+      k++;
+    }
+  }
+  
 }
 

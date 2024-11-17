@@ -1,4 +1,4 @@
-// PC keyboard interface constants
+  // PC keyboard interface constants
 
 #define KBSTATP         0x64    // kbd controller status port(I)
 #define KBS_DIB         0x01    // kbd data in buffer

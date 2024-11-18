@@ -1,5 +1,3 @@
-#define AUTO_COMPLETE_WORDS = 50;
-
 char *autocomplete_words[50] = {
     "hello", "world", "example", "system", "function", "process", "command", "terminal", 
     "keyboard", "display", "program", "error", "message", "input", "output", "file", 

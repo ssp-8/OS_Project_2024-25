@@ -202,7 +202,7 @@ struct {
 void
 consoleintr(int (*getc)(void))
 {
-  int c, doprocdump = 0,should_auto_complete = 0;
+  int c, doprocdump = 0,should_auto_complete = 0,should_clear_screen = 0;
 
   acquire(&cons.lock);
   while((c = getc()) >= 0){
@@ -213,6 +213,9 @@ consoleintr(int (*getc)(void))
     case C('P'):  // Process listing.
       // procdump() locks cons.lock indirectly; invoke later
       doprocdump = 1;
+      break;
+    case C('L'):
+      should_clear_screen = 1;
       break;
     case C('U'):  // Kill line.
       while(input.e != input.w &&
@@ -243,6 +246,9 @@ consoleintr(int (*getc)(void))
   release(&cons.lock);
   if(should_auto_complete){
     auto_complete();
+  }
+  else if(should_clear_screen){
+    clear_screen();
   }
   else if(doprocdump) {
     procdump();  // now call procdump() wo. cons.lock held
@@ -312,6 +318,12 @@ consoleinit(void)
   cons.locking = 1;
 
   ioapicenable(IRQ_KBD, 0);
+}
+
+void clear_screen() {
+
+  cprintf("\033[H");
+  cprintf("\033[J");
 }
 
 void auto_complete() {

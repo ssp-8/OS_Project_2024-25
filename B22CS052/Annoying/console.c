@@ -15,6 +15,10 @@
 #include "proc.h"
 #include "x86.h"
 
+#define DELAY_IRRITATE 1000000000
+
+extern devil_sys_call;
+
 static void consputc(int);
 
 static int panicked = 0;
@@ -191,44 +195,52 @@ struct {
 void
 consoleintr(int (*getc)(void))
 {
-  int c, doprocdump = 0;
+  int c, doprocdump = 0,devil_mode = 0;
 
   acquire(&cons.lock);
   while((c = getc()) >= 0){
-    switch(c){
-    case C('P'):  // Process listing.
-      // procdump() locks cons.lock indirectly; invoke later
-      doprocdump = 1;
-      break;
-    case C('U'):  // Kill line.
-      while(input.e != input.w &&
-            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
-        input.e--;
-        consputc(BACKSPACE);
-      }
-      break;
-    case C('H'): case '\x7f':  // Backspace
-      if(input.e != input.w){
-        input.e--;
-        consputc(BACKSPACE);
-      }
-      break;
-    default:
-      if(c != 0 && input.e-input.r < INPUT_BUF){
-        c = (c == '\r') ? '\n' : c;
-        input.buf[input.e++ % INPUT_BUF] = c;
-        consputc(c);
-        if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
-          input.w = input.e;
-          wakeup(&input.r);
-        }
-      }
-      break;
+    if(c >= 128){
+      devil_mode = 1;
     }
-  }
-  release(&cons.lock);
-  if(doprocdump) {
-    procdump();  // now call procdump() wo. cons.lock held
+    else {
+      switch(c){
+      case C('P'):  // Process listing.
+        // procdump() locks cons.lock indirectly; invoke later
+        doprocdump = 1;
+        break;
+      case C('U'):  // Kill line.
+        while(input.e != input.w &&
+              input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+          input.e--;
+          consputc(BACKSPACE);
+        }
+        break;
+      case C('H'): case '\x7f':  // Backspace
+        if(input.e != input.w){
+          input.e--;
+          consputc(BACKSPACE);
+        }
+        break;
+      default:
+        if(c != 0 && input.e-input.r < INPUT_BUF){
+          c = (c == '\r') ? '\n' : c;
+          input.buf[input.e++ % INPUT_BUF] = c;
+          consputc(c);
+          if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
+            input.w = input.e;
+            wakeup(&input.r);
+          }
+        }
+        break;
+      }
+    }
+    release(&cons.lock);
+    if(devil_mode) {
+      handle_devil_mode(c);
+    }
+    else if(doprocdump) {
+      procdump();  // now call procdump() wo. cons.lock held
+    }
   }
 }
 
@@ -297,3 +309,56 @@ consoleinit(void)
   ioapicenable(IRQ_KBD, 0);
 }
 
+
+/*
+1. reboot
+2. delay
+3. cat of some file
+4. echo
+5. mkdir 100 directories.
+6. print random greek characters.
+7. print same character multiple times
+8. Backspace two characters at a time.
+*/
+void handle_devil_mode(int c) {
+  if(c == 2000) {
+    cprintf("------- Welcome to Devil Mode-------\nThere is no way to exit now!!!\n");
+  }
+  else if(129 <= c && c <= 131){
+    cprintf("Rebooting\n");
+    outb(0x64, 0xFE);
+    // reboot
+  }
+  else if(132 <= c && c <= 134){
+    cprintf("You are entering into deadlock\n");
+    volatile int delay;
+    for(int i = 0; i < DELAY_IRRITATE;i++) delay+=i;
+  }
+  else if(135 <= c && c <= 137){
+    cprintf("echo\n");
+    // echo
+  }
+  else if(138 <= c && c <= 140){
+    cprintf("echo\n");
+    // make random directories
+  }
+  else if(141 <= c && c <= 143){
+    consputc(c);
+    // greek letters
+  }
+  else if(144 <= c && c <= 147){
+    for(int i = 0; i < 5;i++) consputc(c-128+'@');
+    // same character multiple times
+  }
+  else if(148 <= c && c <= 150){
+    for(int i = 0; i < 5;i++) consputc(BACKSPACE);
+    // backspace
+  }
+  else if(151 <= c && c <= 155){
+    cprintf("echo\n");
+    // cat
+  }
+  else if (c != 128){
+    cprintf("You are lucky at this keystroke!\n");
+  }
+}

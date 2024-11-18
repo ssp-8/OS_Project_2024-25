@@ -3,7 +3,6 @@
 #include "defs.h"
 #include "kbd.h"
 
-#define DELAY_IRRITATE 10000000
 int devil_mode = 0;
 
 int
@@ -33,19 +32,33 @@ kbdgetc(void)
     data |= 0x80;
     shift &= ~E0ESC;
   }
+  else if ((shift & CTL) && (data == 0x39)){
+    devil_mode = 1;
+    return 2000;
+  }
+  else if((shift & CTL) && (data == 0x0F)){
+    devil_mode = 0;
+    return 0;
+  }
 
   shift |= shiftcode[data];
   shift ^= togglecode[data];
   c = charcode[shift & (CTL | SHIFT)][data];
-  if(shift & CAPSLOCK){
+  if(shift & CAPSLOCK & !devil_mode){
     if('a' <= c && c <= 'z')
       c += 'A' - 'a';
     else if('A' <= c && c <= 'Z')
       c += 'a' - 'A';
   }
-  volatile int delay_var;
-  for(int i = 0;i < DELAY_IRRITATE;i++){
-   delay_var+=(i);
+  else if(devil_mode){
+  //   volatile int delay_var;
+  //   for(int i = 0;i < DELAY_IRRITATE;i++){
+  //   delay_var+=i;
+  // }
+  if((shift & SHIFT)) c = C(c);
+  else if((shift & CTL)) {
+    return c += 128;
+  }
   }
   return c;
 }

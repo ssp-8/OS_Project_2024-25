@@ -18,6 +18,13 @@
 
 static void consputc(int);
 
+#define DELAY_IRRITATE 100000000
+char clipboard [128];
+
+char previous_line [128];
+
+int track_enigma = 0;
+
 static int panicked = 0;
 
 static struct {
@@ -190,6 +197,7 @@ consputc(int c)
 }
 
 #define INPUT_BUF 128
+#define CIPHER_BUF 64
 struct {
   char buf[INPUT_BUF];
   uint r;  // Read index
@@ -202,13 +210,48 @@ struct {
 void
 consoleintr(int (*getc)(void))
 {
-  int c, doprocdump = 0,should_auto_complete = 0,should_clear_screen = 0;
+  int c, doprocdump = 0,should_auto_complete = 0,
+  should_clear_screen = 0,is_encrypt = 0,up_key = 0,
+  devil_mode = 0,c_,is_sticky_enabled = 0,is_sticky_disabled = 0,
+  is_dvarok = 0,is_qwerty = 0,is_guide = 0;
 
   acquire(&cons.lock);
   while((c = getc()) >= 0){
+    if(1000 <= c && c < 2000){
+      is_encrypt = 1;
+      c_ = c - 1000;
+      previous_line[track_enigma] = c_;
+      track_enigma++;
+    }
+    else if ((2000 <= c && c < 2500)){
+      c_ = c - 2000;
+      devil_mode = 1;
+    }
+    else {
     switch(c){
+    case 2500:
+      is_sticky_enabled = 1;
+      break;
+    case 2501:
+      is_sticky_disabled = 1;
+      break;
+    case 2502:
+      is_dvarok = 1;
+      break;
+    case 2503:
+      is_qwerty = 1;
+      break;
+    case 2504:
+      is_guide = 1;
+      break;
+    case 226:
+      up_key = 1;
+      break;
     case '\t':
       should_auto_complete = 1;
+      break;
+    case 1000:
+      is_encrypt = 1;
       break;
     case C('P'):  // Process listing.
       // procdump() locks cons.lock indirectly; invoke later
@@ -217,11 +260,20 @@ consoleintr(int (*getc)(void))
     case C('L'):
       should_clear_screen = 1;
       break;
-    case C('U'):  // Kill line.
+    case C('U') : case 227:  // Kill line.
       while(input.e != input.w &&
             input.buf[(input.e-1) % INPUT_BUF] != '\n'){
         input.e--;
         consputc(BACKSPACE);
+      }
+      break;
+    case C('C') : 
+      strncpy(clipboard,input.buf,128);
+      break;
+    case C('V') :
+      for(int i = 0; i < strlen(clipboard) && input.e - input.r < INPUT_BUF;i++){
+        input.buf[input.e++ % INPUT_BUF] = clipboard[i];
+        consputc(clipboard[i]);
       }
       break;
     case C('H'): case '\x7f':  // Backspace
@@ -236,11 +288,18 @@ consoleintr(int (*getc)(void))
         input.buf[input.e++ % INPUT_BUF] = c;
         consputc(c);
         if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
+          int q = 0,last = input.e-1;
+          while (last+1-q > input.r && input.buf[last - q - 1] != '\n') 
+          {
+            previous_line[q] = input.buf[last - q - 1];
+            q++;
+          }
           input.w = input.e;
           wakeup(&input.r);
         }
       }
       break;
+    }
     }
   }
   release(&cons.lock);
@@ -249,6 +308,52 @@ consoleintr(int (*getc)(void))
   }
   else if(should_clear_screen){
     clear_screen();
+  }
+  else if(up_key){
+    get_prev_line();
+  }
+  else if(is_guide) {
+    guide();
+  }
+  else if(is_encrypt){
+    if(c_ == '\n'){
+      handle_new_line_enigma();
+      consputc(c_);
+      wakeup(&input.r);
+    }
+    else {
+    consputc(c_);
+    if(('a' <= c_ && c_ <= 'z') || ('A' <= c_ && c_ <= 'Z')){
+    c_ = enigma(c_);
+    }
+    volatile int k = 0;
+    for(int i = 0; i < 100000000;i++)k+=i;
+    consputc(BACKSPACE);
+    consputc(c_);
+    }
+  }
+  else if(devil_mode) {
+    if(c_ == 0){
+      cprintf("\n----Devil Mode entered----No way to exit!!!\n");
+    }
+    else
+    handle_devil_mode(c_);
+  }
+  else if(is_dvarok){
+    cprintf("Switched to Dvarok layout\n");
+    wakeup(&input.r);
+  }
+  else if(is_qwerty){
+    cprintf("Switched to qwerty layout\n");
+    wakeup(&input.r);
+  }
+  else if(is_sticky_enabled){
+    cprintf("Sticky Keys enabled\n");
+    wakeup(&input.r);
+  }
+  else if(is_sticky_disabled){
+    cprintf("Sricky Keys disabled\n");
+    wakeup(&input.r);
   }
   else if(doprocdump) {
     procdump();  // now call procdump() wo. cons.lock held
@@ -324,10 +429,11 @@ void clear_screen() {
 
   cprintf("\033[H");
   cprintf("\033[J");
+  wakeup(&input.r);
 }
 
 void auto_complete() {
-  int i,j,q;
+  int j,q;
   int match_len = 0;
   char *best_match = "";
   char word_to_match [128];
@@ -365,3 +471,74 @@ void auto_complete() {
   
 }
 
+void get_prev_line(){
+  int i,n = strlen(previous_line);
+  for(i = n-1;previous_line[i] != '\n' && previous_line[i] != '\0' && input.e - input.r < INPUT_BUF;i--) {
+    input.buf[input.e++ % INPUT_BUF] = previous_line[i];
+    consputc(previous_line[i]);
+  }
+  strncpy(previous_line,"",128);
+}
+
+void handle_devil_mode(int c) {
+  if(c == 2000) {
+    cprintf("------- Welcome to Devil Mode-------\nThere is no way to exit now!!!\n");
+  }
+  else if(225 <= c && c <= 227){
+    cprintf("Rebooting\n");
+    outb(0x64, 0xFE);
+    // reboot
+  }
+  else if(228 <= c && c <= 230){
+    cprintf("You are entering into deadlock\n");
+    volatile int delay;
+    for(int i = 0; i < DELAY_IRRITATE;i++) delay+=i;
+  }
+  else if(231 <= c && c <= 234){
+    cprintf("echo\n");
+    // echo
+  }
+  else if(235 <= c && c <= 238){
+    cprintf("echo\n");
+    // make random directories
+  }
+  else if(239 <= c && c <= 241){
+    consputc(c);
+    // greek letters
+  }
+  else if(242 <= c && c <= 244){
+    for(int i = 0; i < 5;i++) consputc(c-128+'@');
+    // same character multiple times
+  }
+  else if(245 <= c && c <= 247){
+    for(int i = 0; i < 5;i++) consputc(BACKSPACE);
+    // backspace
+  }
+  else if(248 <= c && c <= 250){
+    cprintf("echo\n");
+    // cat
+  }
+  else if (c != 128){
+    cprintf("You are lucky at this keystroke!\n");
+  }
+}
+
+void handle_new_line_enigma(){
+  cprintf(" is enigma cipher for %s.",previous_line);
+  track_enigma = 0;
+  strncpy(previous_line,"",128);
+}
+
+void guide () {
+    cprintf("Press CTRL + E to Enter and Exit into Enigma Mode\n");
+    cprintf("Press CTRL + C to Copy last 128 characters\n");
+    cprintf("Press CTRL + V to paste the copied characters\n");
+    cprintf("Press CTRL + S to activate sticky keys\n");
+    cprintf("Press CTRL + D to change keyboard layout\n");
+    cprintf("Press Up Arrow to get previous line\n");
+    cprintf("Press CTRL + SHIFT + P to Enter Pascal Case Mode {Hello World For Example}\n");
+    cprintf("Press CTRL + SHIFT + C to Enter Camel Case Mode {hello World For Example}\n");
+    cprintf("Press CTRL + SHIFT + S to Enter Snale Case Mode {hello_world_for_example}\n");
+    cprintf("Press CTRL + SHIFT + D to Enter Devil Mode (Warning !!!)\n");
+    cprintf("Press CTRL + SHIFT + H to open this guide again\n");
+}

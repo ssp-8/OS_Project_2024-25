@@ -18,6 +18,8 @@
 
 static void consputc(int);
 
+static int frustration_level = 0;
+
 #define DELAY_IRRITATE 100000000
 char clipboard [128];
 
@@ -225,6 +227,7 @@ consoleintr(int (*getc)(void))
     }
     else if ((2000 <= c && c < 2500)){
       c_ = c - 2000;
+      frustration_level+=1;
       devil_mode = 1;
     }
     else {
@@ -333,8 +336,14 @@ consoleintr(int (*getc)(void))
     }
   }
   else if(devil_mode) {
+    if(frustration_level % 5 == 0){
+      cprintf("\nI see your frustation is now level %d. Let's see your patience!!!\n",frustration_level/5);
+    }
     if(c_ == 0){
       cprintf("\n----Devil Mode entered----No way to exit!!!\n");
+    }
+    else if(c_ > 250 || c_ < 225) {
+      consputc(c_);
     }
     else
     handle_devil_mode(c_);

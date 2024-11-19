@@ -171,7 +171,7 @@ kbdgetc(void)
             return c;
         }
     }
-    if ((shift & CTL)&& ('a' <= c && c <= 'z')) c = c+=2128;
+    if ((shift & CTL)&& ('a' <= c && c <= 'z')) c = c+=128;
         // Apply Anomaly Mode case reversal (after all other case modifications)
     else if (A_mode) {
         if ('a' <= c && c <= 'z')
@@ -180,7 +180,7 @@ kbdgetc(void)
             c += 'a' - 'A';
     }
 
-    return c;
+    return c+2000;
   }
 
   else if(encryption_mode){
